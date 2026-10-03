@@ -156,5 +156,17 @@ w.document.querySelector('#btn-restart').click();
 assert.equal(layer().children.length, 0, 'restart clears marks');
 t.noteOff(62);
 console.log('wrong-note marks: ok');
+// the on-screen keyboard can be hidden, and that is remembered
+const keysBtn = w.document.querySelector('#btn-keys');
+assert.equal(w.document.querySelector('#keyboard').hidden, false);
+keysBtn.click();
+assert.equal(w.document.querySelector('#keyboard').hidden, true);
+assert.ok(!keysBtn.classList.contains('on'));
+assert.equal(w.localStorage.getItem('showKeyboard'), 'false');
+t.noteOn(60); t.noteOff(60); // playing still works while hidden
+keysBtn.click();
+assert.equal(w.document.querySelector('#keyboard').hidden, false);
+assert.ok(keysBtn.classList.contains('on'));
+console.log('hide keyboard: ok');
 console.log('ALL OK');
 process.exit(0);

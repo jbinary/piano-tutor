@@ -362,6 +362,19 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(() => state.steps.length && rerender(), 300);
 });
 
+// Hide the on-screen keyboard to give the score more room; remembered on this device.
+function showKeyboard(show) {
+  $('#keyboard').hidden = !show;
+  $('#btn-keys').classList.toggle('on', show);
+  try {
+    localStorage.setItem('showKeyboard', String(show));
+  } catch {}
+}
+$('#btn-keys').addEventListener('click', () => showKeyboard($('#keyboard').hidden));
+try {
+  showKeyboard(localStorage.getItem('showKeyboard') !== 'false');
+} catch {}
+
 // ---------------------------------------------------------------- library dialog
 
 async function showLibrary() {
