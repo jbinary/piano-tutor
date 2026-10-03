@@ -155,24 +155,33 @@ t.noteOn(62);
 w.document.querySelector('#btn-restart').click();
 assert.equal(layer().children.length, 0, 'restart clears marks');
 t.noteOff(62);
-// while a wrong key is held, the notes to play are highlighted in blue
-const blues = () => [...layer().querySelectorAll('.mark-target')];
-assert.equal(S.step, 0);
-t.noteOn(62);
-assert.equal(blues().length, 2, 'both notes of the step');
-assert.deepEqual(blues().map(centreY).sort((a, b) => a - b), [staffTop(0) + (38 - 28) * 5, staffTop(1) + (26 - 21) * 5]);
-t.noteOn(63); assert.equal(blues().length, 2, 'not duplicated by a second wrong key');
-t.noteOff(62); assert.equal(blues().length, 2, 'stay while any wrong key is held');
-t.noteOff(63); assert.equal(blues().length, 0, 'gone once all wrong keys are released');
-t.noteOn(62); t.noteOn(60); t.noteOn(48); // finish the step while still holding the wrong key
-assert.equal(S.step, 1); assert.equal(blues().length, 0, 'cleared when moving on');
+// while a wrong key is held, the correct keys held with it are marked in blue the same way
+const blues = () => [...layer().querySelectorAll('.mark-dot.correct')];
+assert.equal(S.step, 0); // wants C4 + C3
+t.noteOn(60);
+assert.equal(blues().length, 0, 'no blue without a wrong key');
+t.noteOn(62); // C4 correct + D4 wrong
+assert.equal(blues().length, 1);
+assert.equal(centreY(blues()[0]), staffTop(0) + (38 - 28) * 5, 'C4 in blue');
+assert.equal(parseFloat(blues()[0].style.left), parseFloat(dots().find((d) => !d.classList.contains('correct')).style.left), 'same column as the red dot');
+assert.equal(layer().querySelectorAll('.mark-ledger.correct').length, 1, "C4's ledger line in blue");
+t.noteOff(60);
+assert.equal(blues().length, 0, 'released correct key loses its blue dot');
+t.noteOn(60);
+assert.equal(blues().length, 1);
+t.noteOff(62);
+assert.equal(blues().length, 0, 'blue goes when no wrong key is held');
+assert.equal(layer().children.length, 0);
+t.noteOn(62); t.noteOn(48); // completing the step moves on and clears the blue
+assert.equal(S.step, 1); assert.equal(blues().length, 0);
 t.noteOff(62); t.noteOff(60); t.noteOff(48);
-// written spelling is used: F#4 in bar 2 sits on the F line
+// written spelling: F#4 in bar 2 is drawn on the F line with a sharp
 while (S.step < 4) w.document.querySelector('#btn-next').click();
-t.noteOn(70);
+t.noteOn(66); t.noteOn(70);
 const top1 = t.osmd.GraphicSheet.MeasureList[1][0].ParentStaffLine.PositionAndShape.AbsolutePosition.y * 10;
-assert.equal(centreY(blues().find((b) => centreY(b) < staffTop(1))), top1 + (38 - 31) * 5);
-t.noteOff(70);
+assert.equal(centreY(blues()[0]), top1 + (38 - 31) * 5);
+assert.equal(layer().querySelector('.mark-sharp.correct')?.textContent, '♯');
+t.noteOff(66); t.noteOff(70);
 const { pitchDiatonic } = await import(`${ROOT}/marks.js`);
 assert.equal(pitchDiatonic({ Octave: 1, FundamentalNote: 11 }), 34, 'Bb4 is written on the B line');
 console.log('wrong-note marks: ok');

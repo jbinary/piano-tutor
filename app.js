@@ -19,7 +19,7 @@ const keyboard = new Keyboard($('#keyboard'), { onNoteOn: noteOn, onNoteOff: not
 
 const state = {
   scoreId: null,
-  /** @type {{bar:number, measureIndex:number, notes:{midi:number, hand:'L'|'R', staffId:number, diatonic:number}[]}[]} one entry per cursor position */
+  /** @type {{bar:number, measureIndex:number, notes:{midi:number, hand:'L'|'R', staffId:number, diatonic:number, alter:number}[]}[]} one entry per cursor position */
   steps: [],
   step: 0,
   cursorStep: 0, // where the OSMD cursor actually is
@@ -31,8 +31,8 @@ const state = {
   wrong: 0,
   /** Elements drawn on the score for each wrong key currently held. @type {Map<number, HTMLElement[]>} */
   marks: new Map(),
-  /** Blue highlights over the notes to play, shown while any wrong key is held. @type {HTMLElement[]} */
-  targetMarks: [],
+  /** Blue marks for the correct keys held, shown while any wrong key is held. @type {HTMLElement[]} */
+  correctMarks: [],
   finished: false,
 };
 
@@ -118,7 +118,7 @@ function collectSteps() {
         // A tied continuation is held, not struck again.
         if (note.NoteTie && note.NoteTie.StartNote !== note) continue;
         const midi = noteMidi(note);
-        if (!notes.has(midi)) notes.set(midi, { midi, hand, staffId: staff.idInMusicSheet, diatonic: pitchDiatonic(note.Pitch) });
+        if (!notes.has(midi)) notes.set(midi, { midi, hand, staffId: staff.idInMusicSheet, diatonic: pitchDiatonic(note.Pitch), alter: note.Pitch.AccidentalHalfTones });
       }
     }
     const measureIndex = cursor.iterator.CurrentMeasureIndex;
@@ -169,8 +169,8 @@ function goTo(i) {
   $('#done').hidden = true;
   state.step = i;
   moveCursor(i);
-  clearTargetMarks();
   state.satisfied.clear();
+  syncCorrectMarks();
   keyboard.setTargets(required(i));
   for (const midi of state.held) keyboard.setHeld(midi, true);
   scrollToCursor();
@@ -245,6 +245,7 @@ function noteOn(midi) {
     addMark(midi, targets);
     updateProgress();
   }
+  syncCorrectMarks();
 }
 
 // ---------------------------------------------------------------- wrong-note marks
@@ -254,12 +255,8 @@ function addMark(midi, targets) {
   const layer = marksLayer(osmd);
   if (state.marks.has(midi) || !targets.length || !layer) return;
   const nearest = targets.reduce((a, b) => (Math.abs(b.midi - midi) < Math.abs(a.midi - midi) ? b : a));
-  const x = cursorX();
   const { measureIndex } = state.steps[state.step];
-  state.marks.set(midi, drawMark(layer, osmd, { x, measureIndex, staffId: nearest.staffId, midi }));
-  if (!state.targetMarks.length) {
-    state.targetMarks = targets.flatMap((n) => drawMark(layer, osmd, { ...n, x, measureIndex, kind: 'target' }));
-  }
+  state.marks.set(midi, drawMark(layer, osmd, { x: cursorX(), measureIndex, staffId: nearest.staffId, midi }));
 }
 
 /** Horizontal centre of the cursor in page px, which is where its notes are drawn. */
@@ -271,17 +268,24 @@ function cursorX() {
 function removeMark(midi) {
   for (const el of state.marks.get(midi) ?? []) el.remove();
   state.marks.delete(midi);
-  if (!state.marks.size) clearTargetMarks();
 }
 
-function clearTargetMarks() {
-  for (const el of state.targetMarks) el.remove();
-  state.targetMarks = [];
+/** While a wrong key is held, also show the correct keys held with it, in blue. */
+function syncCorrectMarks() {
+  for (const el of state.correctMarks) el.remove();
+  state.correctMarks = [];
+  const layer = marksLayer(osmd);
+  if (!state.marks.size || !state.satisfied.size || !layer) return;
+  const { measureIndex } = state.steps[state.step];
+  const x = cursorX();
+  for (const n of required(state.step)) {
+    if (state.satisfied.has(n.midi)) state.correctMarks.push(...drawMark(layer, osmd, { ...n, x, measureIndex, kind: 'correct' }));
+  }
 }
 
 function clearMarks() {
   state.marks.clear();
-  state.targetMarks = [];
+  state.correctMarks = [];
   marksLayer(osmd)?.replaceChildren();
 }
 
@@ -291,6 +295,7 @@ function noteOff(midi) {
   removeMark(midi);
   // Chord notes must be held together: letting one go before the rest are down undoes it.
   if (state.satisfied.delete(midi)) keyboard.markOk(midi, false);
+  syncCorrectMarks();
 }
 
 // Keep the tablet screen on while practising.

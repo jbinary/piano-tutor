@@ -124,12 +124,6 @@ button:active { filter: brightness(1.3); }
   background: var(--wrong);
   opacity: .8;
 }
-.mark-target {
-  position: absolute;
-  border-radius: 50%;
-  background: var(--right);
-  opacity: .55;
-}
 .mark-ledger {
   position: absolute;
   height: 1.5px;
@@ -140,6 +134,8 @@ button:active { filter: brightness(1.3); }
   color: var(--wrong);
   line-height: 1;
 }
+.mark-dot.correct, .mark-ledger.correct { background: var(--right); }
+.mark-sharp.correct { color: var(--right); }
 
 #empty {
   text-align: center;
