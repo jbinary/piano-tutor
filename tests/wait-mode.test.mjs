@@ -155,6 +155,26 @@ t.noteOn(62);
 w.document.querySelector('#btn-restart').click();
 assert.equal(layer().children.length, 0, 'restart clears marks');
 t.noteOff(62);
+// while a wrong key is held, the notes to play are highlighted in blue
+const blues = () => [...layer().querySelectorAll('.mark-target')];
+assert.equal(S.step, 0);
+t.noteOn(62);
+assert.equal(blues().length, 2, 'both notes of the step');
+assert.deepEqual(blues().map(centreY).sort((a, b) => a - b), [staffTop(0) + (38 - 28) * 5, staffTop(1) + (26 - 21) * 5]);
+t.noteOn(63); assert.equal(blues().length, 2, 'not duplicated by a second wrong key');
+t.noteOff(62); assert.equal(blues().length, 2, 'stay while any wrong key is held');
+t.noteOff(63); assert.equal(blues().length, 0, 'gone once all wrong keys are released');
+t.noteOn(62); t.noteOn(60); t.noteOn(48); // finish the step while still holding the wrong key
+assert.equal(S.step, 1); assert.equal(blues().length, 0, 'cleared when moving on');
+t.noteOff(62); t.noteOff(60); t.noteOff(48);
+// written spelling is used: F#4 in bar 2 sits on the F line
+while (S.step < 4) w.document.querySelector('#btn-next').click();
+t.noteOn(70);
+const top1 = t.osmd.GraphicSheet.MeasureList[1][0].ParentStaffLine.PositionAndShape.AbsolutePosition.y * 10;
+assert.equal(centreY(blues().find((b) => centreY(b) < staffTop(1))), top1 + (38 - 31) * 5);
+t.noteOff(70);
+const { pitchDiatonic } = await import(`${ROOT}/marks.js`);
+assert.equal(pitchDiatonic({ Octave: 1, FundamentalNote: 11 }), 34, 'Bb4 is written on the B line');
 console.log('wrong-note marks: ok');
 // the on-screen keyboard can be hidden, and that is remembered
 const keysBtn = w.document.querySelector('#btn-keys');

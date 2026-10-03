@@ -3,7 +3,7 @@
 import { Keyboard } from './keyboard.js';
 import { connectMidi } from './midi.js';
 import * as library from './library.js';
-import { drawMark, marksLayer } from './marks.js';
+import { drawMark, marksLayer, pitchDiatonic } from './marks.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -19,7 +19,7 @@ const keyboard = new Keyboard($('#keyboard'), { onNoteOn: noteOn, onNoteOff: not
 
 const state = {
   scoreId: null,
-  /** @type {{bar:number, measureIndex:number, notes:{midi:number, hand:'L'|'R', staffId:number}[]}[]} one entry per cursor position */
+  /** @type {{bar:number, measureIndex:number, notes:{midi:number, hand:'L'|'R', staffId:number, diatonic:number}[]}[]} one entry per cursor position */
   steps: [],
   step: 0,
   cursorStep: 0, // where the OSMD cursor actually is
@@ -31,6 +31,8 @@ const state = {
   wrong: 0,
   /** Elements drawn on the score for each wrong key currently held. @type {Map<number, HTMLElement[]>} */
   marks: new Map(),
+  /** Blue highlights over the notes to play, shown while any wrong key is held. @type {HTMLElement[]} */
+  targetMarks: [],
   finished: false,
 };
 
@@ -116,7 +118,7 @@ function collectSteps() {
         // A tied continuation is held, not struck again.
         if (note.NoteTie && note.NoteTie.StartNote !== note) continue;
         const midi = noteMidi(note);
-        if (!notes.has(midi)) notes.set(midi, { midi, hand, staffId: staff.idInMusicSheet });
+        if (!notes.has(midi)) notes.set(midi, { midi, hand, staffId: staff.idInMusicSheet, diatonic: pitchDiatonic(note.Pitch) });
       }
     }
     const measureIndex = cursor.iterator.CurrentMeasureIndex;
@@ -167,6 +169,7 @@ function goTo(i) {
   $('#done').hidden = true;
   state.step = i;
   moveCursor(i);
+  clearTargetMarks();
   state.satisfied.clear();
   keyboard.setTargets(required(i));
   for (const midi of state.held) keyboard.setHeld(midi, true);
@@ -251,19 +254,34 @@ function addMark(midi, targets) {
   const layer = marksLayer(osmd);
   if (state.marks.has(midi) || !targets.length || !layer) return;
   const nearest = targets.reduce((a, b) => (Math.abs(b.midi - midi) < Math.abs(a.midi - midi) ? b : a));
-  const el = osmd.cursor.cursorElement;
-  const x = parseFloat(el.style.left) + el.width / 2; // the cursor's centre is where its notes are drawn
+  const x = cursorX();
   const { measureIndex } = state.steps[state.step];
   state.marks.set(midi, drawMark(layer, osmd, { x, measureIndex, staffId: nearest.staffId, midi }));
+  if (!state.targetMarks.length) {
+    state.targetMarks = targets.flatMap((n) => drawMark(layer, osmd, { ...n, x, measureIndex, kind: 'target' }));
+  }
+}
+
+/** Horizontal centre of the cursor in page px, which is where its notes are drawn. */
+function cursorX() {
+  const el = osmd.cursor.cursorElement;
+  return parseFloat(el.style.left) + el.width / 2;
 }
 
 function removeMark(midi) {
   for (const el of state.marks.get(midi) ?? []) el.remove();
   state.marks.delete(midi);
+  if (!state.marks.size) clearTargetMarks();
+}
+
+function clearTargetMarks() {
+  for (const el of state.targetMarks) el.remove();
+  state.targetMarks = [];
 }
 
 function clearMarks() {
   state.marks.clear();
+  state.targetMarks = [];
   marksLayer(osmd)?.replaceChildren();
 }
 
