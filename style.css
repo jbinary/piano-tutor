@@ -111,6 +111,30 @@ button:active { filter: brightness(1.3); }
 
 #score { min-height: 100%; }
 
+/* Wrong-note marks, drawn over the score page (see marks.js). */
+.marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.mark-dot {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--wrong);
+  opacity: .8;
+}
+.mark-ledger {
+  position: absolute;
+  height: 1.5px;
+  background: var(--wrong);
+}
+.mark-sharp {
+  position: absolute;
+  color: var(--wrong);
+  line-height: 1;
+}
+
 #empty {
   text-align: center;
   padding: 48px 16px;

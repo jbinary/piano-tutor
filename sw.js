@@ -1,6 +1,6 @@
 // Offline support: serve the app shell from cache, refreshing it in the background.
 
-const CACHE = 'piano-tutor-v4';
+const CACHE = 'piano-tutor-v5';
 const SHELL = [
   './',
   'index.html',
@@ -9,6 +9,7 @@ const SHELL = [
   'keyboard.js',
   'midi.js',
   'library.js',
+  'marks.js',
   'manifest.webmanifest',
   'vendor/opensheetmusicdisplay.min.js',
   'icons/icon.svg',

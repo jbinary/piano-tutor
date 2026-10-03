@@ -3,6 +3,7 @@
 import { Keyboard } from './keyboard.js';
 import { connectMidi } from './midi.js';
 import * as library from './library.js';
+import { drawMark, marksLayer } from './marks.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -18,7 +19,7 @@ const keyboard = new Keyboard($('#keyboard'), { onNoteOn: noteOn, onNoteOff: not
 
 const state = {
   scoreId: null,
-  /** @type {{bar:number, notes:{midi:number, hand:'L'|'R'}[]}[]} one entry per cursor position */
+  /** @type {{bar:number, measureIndex:number, notes:{midi:number, hand:'L'|'R', staffId:number}[]}[]} one entry per cursor position */
   steps: [],
   step: 0,
   cursorStep: 0, // where the OSMD cursor actually is
@@ -28,6 +29,8 @@ const state = {
   satisfied: new Set(),
   held: new Set(),
   wrong: 0,
+  /** Wrong keys shown on the score, keyed by `${step}:${midi}`. @type {Map<string,{step:number, midi:number, staffId:number}>} */
+  marks: new Map(),
   finished: false,
 };
 
@@ -83,6 +86,8 @@ async function openScore(id) {
   osmd.cursor.show();
   state.steps = collectSteps();
   state.cursorStep = 0;
+  state.marks.clear();
+  state.wrong = 0;
 
   const all = state.steps.flatMap((s) => s.notes.map((n) => n.midi));
   if (all.length) keyboard.setRange(Math.min(...all), Math.max(...all));
@@ -111,11 +116,12 @@ function collectSteps() {
         // A tied continuation is held, not struck again.
         if (note.NoteTie && note.NoteTie.StartNote !== note) continue;
         const midi = noteMidi(note);
-        if (!notes.has(midi)) notes.set(midi, { midi, hand });
+        if (!notes.has(midi)) notes.set(midi, { midi, hand, staffId: staff.idInMusicSheet });
       }
     }
-    const measure = osmd.Sheet.SourceMeasures[cursor.iterator.CurrentMeasureIndex];
-    steps.push({ bar: measure?.MeasureNumber ?? cursor.iterator.CurrentMeasureIndex + 1, notes: [...notes.values()] });
+    const measureIndex = cursor.iterator.CurrentMeasureIndex;
+    const bar = osmd.Sheet.SourceMeasures[measureIndex]?.MeasureNumber ?? measureIndex + 1;
+    steps.push({ bar, measureIndex, notes: [...notes.values()] });
     cursor.next();
   }
   cursor.reset();
@@ -233,8 +239,46 @@ function noteOn(midi) {
   } else {
     state.wrong++;
     keyboard.flashWrong(midi);
+    addMark(midi, targets);
     updateProgress();
   }
+}
+
+// ---------------------------------------------------------------- wrong-note marks
+
+/** Mark a wrong key on the staff of the nearest note you were meant to play. */
+function addMark(midi, targets) {
+  const key = `${state.step}:${midi}`;
+  if (state.marks.has(key) || !targets.length) return;
+  const nearest = targets.reduce((a, b) => (Math.abs(b.midi - midi) < Math.abs(a.midi - midi) ? b : a));
+  const mark = { step: state.step, midi, staffId: nearest.staffId };
+  state.marks.set(key, mark);
+  const layer = marksLayer(osmd);
+  if (layer) drawMark(layer, osmd, { ...mark, x: cursorX(), measureIndex: state.steps[state.step].measureIndex });
+}
+
+/** Horizontal centre of the cursor in page px, which is where its notes are drawn. */
+function cursorX() {
+  const el = osmd.cursor.cursorElement;
+  return parseFloat(el.style.left) + el.width / 2;
+}
+
+function clearMarks() {
+  state.marks.clear();
+  marksLayer(osmd)?.replaceChildren();
+}
+
+/** Redraw all marks after a re-render, by visiting each marked step with the cursor. */
+function redrawMarks() {
+  const layer = marksLayer(osmd);
+  if (!layer) return;
+  layer.replaceChildren();
+  const byStep = Map.groupBy(state.marks.values(), (m) => m.step);
+  for (const step of [...byStep.keys()].sort((a, b) => a - b)) {
+    moveCursor(step);
+    for (const m of byStep.get(step)) drawMark(layer, osmd, { ...m, x: cursorX(), measureIndex: state.steps[step].measureIndex });
+  }
+  moveCursor(state.step);
 }
 
 function noteOff(midi) {
@@ -290,10 +334,12 @@ $('#loop-to').addEventListener('change', readLoop);
 
 $('#btn-restart').addEventListener('click', () => {
   state.wrong = 0;
+  clearMarks();
   goTo(firstPlayable());
 });
 $('#btn-again').addEventListener('click', () => {
   state.wrong = 0;
+  clearMarks();
   goTo(firstPlayable());
 });
 $('#btn-prev').addEventListener('click', back);
@@ -315,6 +361,7 @@ function rerender() {
   osmd.cursor.show();
   state.cursorStep = 0;
   osmd.cursor.reset();
+  redrawMarks();
   moveCursor(state.step);
   scrollToCursor();
 }
