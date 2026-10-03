@@ -40,11 +40,17 @@ const cursorBar = () => t.osmd.cursor.iterator.CurrentMeasureIndex;
 
 play(60); assert.equal(S.step, 0, 'needs both hands');
 play(61); assert.equal(S.wrong, 1);
-play(48); assert.equal(S.step, 1);
+play(48); assert.equal(S.step, 0, 'hands played one after another do not count');
+play(60, 48); assert.equal(S.step, 1);
 play(62); assert.equal(S.step, 2);
 play(64, 43); assert.equal(S.step, 3);
 play(60, 64); assert.equal(S.step, 3, 'chord incomplete');
-play(67); assert.equal(S.step, 4); assert.equal(cursorBar(), 1);
+play(67); assert.equal(S.step, 3, 'chord notes played one after another do not count');
+t.noteOn(60); t.noteOn(64); t.noteOff(60); t.noteOn(67);
+assert.equal(S.step, 3, 'a chord note released early does not count');
+assert.ok(!w.document.querySelector('[data-midi="60"]').classList.contains('ok'), 'released chord note loses its green');
+t.noteOn(60); assert.equal(S.step, 4, 'all held together'); assert.equal(cursorBar(), 1);
+t.noteOff(60); t.noteOff(64); t.noteOff(67);
 play(66, 48); assert.equal(S.finished, true);
 console.log('both hands: ok');
 

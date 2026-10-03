@@ -82,8 +82,8 @@ export class Keyboard {
     this.keys.get(midi)?.classList.toggle('held', held);
   }
 
-  markOk(midi) {
-    this.keys.get(midi)?.classList.add('ok');
+  markOk(midi, ok = true) {
+    this.keys.get(midi)?.classList.toggle('ok', ok);
   }
 
   flashWrong(midi) {

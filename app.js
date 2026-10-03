@@ -26,7 +26,7 @@ const state = {
   hand: 'both',
   zoom: 1,
   loop: { on: false, from: 1, to: 4 },
-  satisfied: new Set(),
+  satisfied: new Set(), // notes of the current step pressed and still held
   held: new Set(),
   wrong: 0,
   /** Elements drawn on the score for each wrong key currently held. @type {Map<number, HTMLElement[]>} */
@@ -271,6 +271,8 @@ function noteOff(midi) {
   state.held.delete(midi);
   keyboard.setHeld(midi, false);
   removeMark(midi);
+  // Chord notes must be held together: letting one go before the rest are down undoes it.
+  if (state.satisfied.delete(midi)) keyboard.markOk(midi, false);
 }
 
 // Keep the tablet screen on while practising.
