@@ -118,35 +118,37 @@ for (const [name, order] of [
 }
 console.log('repeats: ok');
 
-// wrong notes are marked on the score at the right pitch and staff
+// held wrong notes are marked on the score at the right pitch and staff, and vanish on release
 await loadSample('test-two-hands.musicxml');
 const layer = () => w.document.querySelector('.marks');
 const dots = () => [...layer().querySelectorAll('.mark-dot')];
 const centreY = (el) => parseFloat(el.style.top) + parseFloat(el.style.height) / 2;
 const staffTop = (i) => t.osmd.GraphicSheet.MeasureList[0][i].ParentStaffLine.PositionAndShape.AbsolutePosition.y * 10;
 // step 0 wants C4 (treble) + C3 (bass)
-play(62); // D4: one staff step above C4 on the treble staff (top line F5)
+t.noteOn(62); // D4: one staff step above C4 on the treble staff (top line F5)
 assert.equal(dots().length, 1);
 assert.equal(centreY(dots()[0]), staffTop(0) + (38 - 29) * 5);
-play(62); // same wrong note again is not drawn twice
-assert.equal(dots().length, 1);
-play(50); // D3: nearest target is C3, so it goes on the bass staff (top line A3)
+t.noteOn(50); // D3: nearest target is C3, so it goes on the bass staff (top line A3)
 assert.equal(centreY(dots()[1]), staffTop(1) + (26 - 22) * 5);
-play(61); // C#4 is drawn on the C line with a sharp
-assert.equal(centreY(dots()[2]), staffTop(0) + (38 - 28) * 5);
+t.noteOff(62);
+assert.equal(dots().length, 1, 'released key loses its dot');
+assert.equal(centreY(dots()[0]), staffTop(1) + (26 - 22) * 5, 'held key keeps its dot');
+t.noteOff(50);
+assert.equal(layer().children.length, 0);
+t.noteOn(61); // C#4 is drawn on the C line with a sharp and a ledger line
+assert.equal(centreY(dots()[0]), staffTop(0) + (38 - 28) * 5);
 assert.equal(layer().querySelectorAll('.mark-sharp').length, 1);
-play(84); // C6 needs two ledger lines above the treble staff
-assert.equal(layer().querySelectorAll('.mark-ledger').length, 2 + 1); // + C4's ledger line below
-assert.equal(S.wrong, 5);
-play(60, 48); assert.equal(S.step, 1, 'still advances after mistakes');
-assert.equal(dots().length, 4, 'marks stay after moving on');
-w.dispatchEvent(new w.Event('resize'));
-await new Promise((r) => setTimeout(r, 400));
-assert.equal(dots().length, 4, 'marks survive a re-render');
-assert.equal(centreY(dots()[0]), staffTop(0) + (38 - 29) * 5);
-assert.equal(S.step, 1); assert.equal(t.osmd.cursor.iterator.CurrentVoiceEntries[0].Notes[0].halfTone + 12, 62, 'cursor restored');
+assert.equal(layer().querySelectorAll('.mark-ledger').length, 1);
+t.noteOff(61);
+assert.equal(layer().children.length, 0, 'sharp and ledger line go too');
+t.noteOn(84); // C6 needs two ledger lines above the treble staff
+assert.equal(layer().querySelectorAll('.mark-ledger').length, 2);
+t.noteOff(84);
+assert.equal(S.wrong, 4);
+t.noteOn(62);
 w.document.querySelector('#btn-restart').click();
-assert.equal(dots().length, 0, 'restart clears marks');
+assert.equal(layer().children.length, 0, 'restart clears marks');
+t.noteOff(62);
 console.log('wrong-note marks: ok');
 console.log('ALL OK');
 process.exit(0);

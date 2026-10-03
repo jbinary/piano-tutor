@@ -29,7 +29,7 @@ const state = {
   satisfied: new Set(),
   held: new Set(),
   wrong: 0,
-  /** Wrong keys shown on the score, keyed by `${step}:${midi}`. @type {Map<string,{step:number, midi:number, staffId:number}>} */
+  /** Elements drawn on the score for each wrong key currently held. @type {Map<number, HTMLElement[]>} */
   marks: new Map(),
   finished: false,
 };
@@ -86,7 +86,7 @@ async function openScore(id) {
   osmd.cursor.show();
   state.steps = collectSteps();
   state.cursorStep = 0;
-  state.marks.clear();
+  clearMarks();
   state.wrong = 0;
 
   const all = state.steps.flatMap((s) => s.notes.map((n) => n.midi));
@@ -246,21 +246,20 @@ function noteOn(midi) {
 
 // ---------------------------------------------------------------- wrong-note marks
 
-/** Mark a wrong key on the staff of the nearest note you were meant to play. */
+/** Mark a held wrong key on the staff of the nearest note you were meant to play. */
 function addMark(midi, targets) {
-  const key = `${state.step}:${midi}`;
-  if (state.marks.has(key) || !targets.length) return;
-  const nearest = targets.reduce((a, b) => (Math.abs(b.midi - midi) < Math.abs(a.midi - midi) ? b : a));
-  const mark = { step: state.step, midi, staffId: nearest.staffId };
-  state.marks.set(key, mark);
   const layer = marksLayer(osmd);
-  if (layer) drawMark(layer, osmd, { ...mark, x: cursorX(), measureIndex: state.steps[state.step].measureIndex });
+  if (state.marks.has(midi) || !targets.length || !layer) return;
+  const nearest = targets.reduce((a, b) => (Math.abs(b.midi - midi) < Math.abs(a.midi - midi) ? b : a));
+  const el = osmd.cursor.cursorElement;
+  const x = parseFloat(el.style.left) + el.width / 2; // the cursor's centre is where its notes are drawn
+  const { measureIndex } = state.steps[state.step];
+  state.marks.set(midi, drawMark(layer, osmd, { x, measureIndex, staffId: nearest.staffId, midi }));
 }
 
-/** Horizontal centre of the cursor in page px, which is where its notes are drawn. */
-function cursorX() {
-  const el = osmd.cursor.cursorElement;
-  return parseFloat(el.style.left) + el.width / 2;
+function removeMark(midi) {
+  for (const el of state.marks.get(midi) ?? []) el.remove();
+  state.marks.delete(midi);
 }
 
 function clearMarks() {
@@ -268,22 +267,10 @@ function clearMarks() {
   marksLayer(osmd)?.replaceChildren();
 }
 
-/** Redraw all marks after a re-render, by visiting each marked step with the cursor. */
-function redrawMarks() {
-  const layer = marksLayer(osmd);
-  if (!layer) return;
-  layer.replaceChildren();
-  const byStep = Map.groupBy(state.marks.values(), (m) => m.step);
-  for (const step of [...byStep.keys()].sort((a, b) => a - b)) {
-    moveCursor(step);
-    for (const m of byStep.get(step)) drawMark(layer, osmd, { ...m, x: cursorX(), measureIndex: state.steps[step].measureIndex });
-  }
-  moveCursor(state.step);
-}
-
 function noteOff(midi) {
   state.held.delete(midi);
   keyboard.setHeld(midi, false);
+  removeMark(midi);
 }
 
 // Keep the tablet screen on while practising.
@@ -361,7 +348,7 @@ function rerender() {
   osmd.cursor.show();
   state.cursorStep = 0;
   osmd.cursor.reset();
-  redrawMarks();
+  clearMarks();
   moveCursor(state.step);
   scrollToCursor();
 }

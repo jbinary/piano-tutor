@@ -1,4 +1,4 @@
-// Red dots on the score showing which wrong keys were played, placed on the staff by pitch.
+// Red dots on the score showing which wrong keys are being held, placed on the staff by pitch.
 
 // Diatonic step (C=0 … B=6) and whether the key is a sharp, for each pitch class.
 const STEP = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
@@ -32,6 +32,7 @@ export function marksLayer(osmd) {
 
 /**
  * Draw one wrong note.
+ * @returns {HTMLElement[]} the drawn elements, so the caller can remove them
  * @param {HTMLElement} layer
  * @param {object} osmd
  * @param {{x:number, measureIndex:number, staffId:number, midi:number}} mark x is the note column in px
@@ -39,7 +40,7 @@ export function marksLayer(osmd) {
 export function drawMark(layer, osmd, { x, measureIndex, staffId, midi }) {
   const measure = osmd.GraphicSheet.MeasureList[measureIndex]?.find((m) => m?.ParentStaff?.idInMusicSheet === staffId);
   const top = topLine(measure?.InitiallyActiveClef);
-  if (!measure || top === null) return;
+  if (!measure || top === null) return [];
 
   const unit = 10 * osmd.zoom; // px per staff space
   const staffTop = measure.ParentStaffLine.PositionAndShape.AbsolutePosition.y * unit;
@@ -47,12 +48,14 @@ export function drawMark(layer, osmd, { x, measureIndex, staffId, midi }) {
   const cx = x + 1.4 * unit; // just right of the correct note so both stay readable
   const d = diatonic(midi);
 
+  const els = [];
   const add = (cls, style, text) => {
     const el = document.createElement('div');
     el.className = cls;
     Object.assign(el.style, style);
     if (text) el.textContent = text;
     layer.append(el);
+    els.push(el);
   };
 
   // Ledger lines so notes above/below the staff can be read.
@@ -66,4 +69,5 @@ export function drawMark(layer, osmd, { x, measureIndex, staffId, midi }) {
   if (SHARP[midi % 12]) {
     add('mark-sharp', { left: `${cx - 1.9 * unit}px`, top: `${yOf(d) - 1.1 * unit}px`, fontSize: `${1.6 * unit}px` }, '♯');
   }
+  return els;
 }
