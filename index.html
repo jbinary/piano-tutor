@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f2937">
+  <title>Piano Tutor</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="toolbar">
+    <button id="btn-library" title="Library">☰ Library</button>
+    <span id="title" class="grow">No piece loaded</span>
+
+    <div class="group" title="Which hand to practise">
+      <button data-hand="L">Left</button>
+      <button data-hand="both" class="on">Both</button>
+      <button data-hand="R">Right</button>
+    </div>
+
+    <div class="group">
+      <button id="btn-restart" title="Back to start (or loop start)">⏮</button>
+      <button id="btn-prev" title="Previous note">◀</button>
+      <button id="btn-next" title="Skip note">▶</button>
+    </div>
+
+    <div class="group" title="Loop a range of bars">
+      <label><input type="checkbox" id="loop-on"> Loop bars</label>
+      <input type="number" id="loop-from" min="1" value="1" inputmode="numeric">
+      <span>–</span>
+      <input type="number" id="loop-to" min="1" value="4" inputmode="numeric">
+    </div>
+
+    <div class="group">
+      <button id="btn-zoom-out" title="Smaller">A−</button>
+      <button id="btn-zoom-in" title="Larger">A+</button>
+    </div>
+
+    <span id="progress"></span>
+    <span id="midi-status" class="pill" title="Tap to reconnect">MIDI: –</span>
+  </header>
+
+  <main id="score-wrap">
+    <div id="empty">
+      <p>Open a <b>MusicXML</b> file (<code>.musicxml</code>, <code>.mxl</code>, <code>.xml</code>)<br>
+        exported from Songscription, MuseScore, etc.</p>
+      <label class="big-button">Open file…<input type="file" class="file-input" accept=".musicxml,.mxl,.xml,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml" hidden></label>
+      <p class="hint">Connect your digital piano with a USB (OTG) cable. The cursor waits until you play the right notes.</p>
+    </div>
+    <div id="score"></div>
+    <div id="done" hidden>🎉 Finished! <button id="btn-again">Play again</button></div>
+  </main>
+
+  <footer id="keyboard"></footer>
+
+  <dialog id="library">
+    <form method="dialog" class="lib-head">
+      <h2>Library</h2>
+      <button value="close">✕</button>
+    </form>
+    <ul id="lib-list"></ul>
+    <label class="big-button">Add file…<input type="file" class="file-input" accept=".musicxml,.mxl,.xml,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml" hidden></label>
+  </dialog>
+
+  <script src="vendor/opensheetmusicdisplay.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
