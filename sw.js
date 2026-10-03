@@ -1,6 +1,6 @@
 // Offline support: always load the current version when online, fall back to the cached copy offline.
 
-const CACHE = 'piano-tutor-v9';
+const CACHE = 'piano-tutor-v10';
 const SHELL = [
   './',
   'index.html',

@@ -10,10 +10,13 @@ export async function connectMidi({ onNoteOn, onNoteOff, onStatus }) {
   }
 
   let access;
+  onStatus('MIDI: waiting for permission…', false);
   try {
     access = await navigator.requestMIDIAccess();
   } catch (err) {
-    onStatus('MIDI: permission denied', false);
+    onStatus(err?.name === 'SecurityError' || err?.name === 'NotAllowedError'
+      ? 'MIDI: permission denied'
+      : `MIDI: ${err?.name ?? 'error'} ${err?.message ?? ''}`.trim(), false);
     console.warn(err);
     return;
   }

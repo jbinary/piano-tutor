@@ -416,17 +416,20 @@ for (const input of document.querySelectorAll('.file-input')) {
 
 // ---------------------------------------------------------------- startup
 
+// The pill shows the full status (device name or what is wrong) for a few seconds after it
+// changes, then shrinks to a short label so the toolbar stays on one row.
+let midiStatusTimer;
+function showMidiStatus(text, connected) {
+  const pill = $('#midi-status');
+  pill.textContent = text;
+  pill.title = `${text}\nTap to reconnect`;
+  pill.classList.toggle('connected', connected);
+  clearTimeout(midiStatusTimer);
+  midiStatusTimer = setTimeout(() => (pill.textContent = connected ? 'MIDI ✓' : 'MIDI ✗'), 5000);
+}
+
 function startMidi() {
-  connectMidi({
-    onNoteOn: noteOn,
-    onNoteOff: noteOff,
-    onStatus: (text, connected) => {
-      // Short label keeps the toolbar on one row; the device name / reason is in the tooltip.
-      $('#midi-status').textContent = connected ? 'MIDI ✓' : 'MIDI ✗';
-      $('#midi-status').title = `${text}\nTap to reconnect`;
-      $('#midi-status').classList.toggle('connected', connected);
-    },
-  });
+  connectMidi({ onNoteOn: noteOn, onNoteOff: noteOff, onStatus: showMidiStatus });
 }
 $('#midi-status').addEventListener('click', startMidi);
 startMidi();
