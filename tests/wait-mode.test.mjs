@@ -155,14 +155,14 @@ t.noteOn(62);
 w.document.querySelector('#btn-restart').click();
 assert.equal(layer().children.length, 0, 'restart clears marks');
 t.noteOff(62);
-// while a wrong key is held, the correct keys held with it are marked in blue the same way
+// correct keys held while the step is incomplete are marked in blue, the same way as wrong ones
 const blues = () => [...layer().querySelectorAll('.mark-dot.correct')];
 assert.equal(S.step, 0); // wants C4 + C3
 t.noteOn(60);
-assert.equal(blues().length, 0, 'no blue without a wrong key');
-t.noteOn(62); // C4 correct + D4 wrong
-assert.equal(blues().length, 1);
+assert.equal(blues().length, 1, 'blue while C3 is still missing, even with no wrong key');
 assert.equal(centreY(blues()[0]), staffTop(0) + (38 - 28) * 5, 'C4 in blue');
+t.noteOn(62); // plus D4 wrong
+assert.equal(blues().length, 1);
 assert.equal(parseFloat(blues()[0].style.left), parseFloat(dots().find((d) => !d.classList.contains('correct')).style.left), 'same column as the red dot');
 assert.equal(layer().querySelectorAll('.mark-ledger.correct').length, 1, "C4's ledger line in blue");
 t.noteOff(60);
@@ -170,10 +170,10 @@ assert.equal(blues().length, 0, 'released correct key loses its blue dot');
 t.noteOn(60);
 assert.equal(blues().length, 1);
 t.noteOff(62);
-assert.equal(blues().length, 0, 'blue goes when no wrong key is held');
-assert.equal(layer().children.length, 0);
+assert.equal(blues().length, 1, 'blue stays after the wrong key is released');
 t.noteOn(62); t.noteOn(48); // completing the step moves on and clears the blue
 assert.equal(S.step, 1); assert.equal(blues().length, 0);
+assert.equal(layer().querySelectorAll('.correct').length, 0);
 t.noteOff(62); t.noteOff(60); t.noteOff(48);
 // written spelling: F#4 in bar 2 is drawn on the F line with a sharp
 while (S.step < 4) w.document.querySelector('#btn-next').click();

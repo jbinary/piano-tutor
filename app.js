@@ -31,7 +31,7 @@ const state = {
   wrong: 0,
   /** Elements drawn on the score for each wrong key currently held. @type {Map<number, HTMLElement[]>} */
   marks: new Map(),
-  /** Blue marks for the correct keys held, shown while any wrong key is held. @type {HTMLElement[]} */
+  /** Blue marks for the correct keys held while the step is not yet complete. @type {HTMLElement[]} */
   correctMarks: [],
   finished: false,
 };
@@ -270,12 +270,12 @@ function removeMark(midi) {
   state.marks.delete(midi);
 }
 
-/** While a wrong key is held, also show the correct keys held with it, in blue. */
+/** Show the correct keys held so far in blue, so an incomplete chord shows what is still missing. */
 function syncCorrectMarks() {
   for (const el of state.correctMarks) el.remove();
   state.correctMarks = [];
   const layer = marksLayer(osmd);
-  if (!state.marks.size || !state.satisfied.size || !layer) return;
+  if (!state.satisfied.size || !layer) return;
   const { measureIndex } = state.steps[state.step];
   const x = cursorX();
   for (const n of required(state.step)) {

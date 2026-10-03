@@ -1,5 +1,5 @@
-// Dots on the score placed on the staff by pitch: red for wrong keys being held and, while there
-// are any, blue for the correct keys held with them.
+// Dots on the score placed on the staff by pitch: red for wrong keys being held, blue for correct
+// keys held while the step is still incomplete.
 
 // Diatonic step (C=0 … B=6) and whether the key is a sharp, for each pitch class.
 const STEP = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
