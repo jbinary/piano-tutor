@@ -1,6 +1,6 @@
 // Offline support: serve the app shell from cache, refreshing it in the background.
 
-const CACHE = 'piano-tutor-v2';
+const CACHE = 'piano-tutor-v3';
 const SHELL = [
   './',
   'index.html',

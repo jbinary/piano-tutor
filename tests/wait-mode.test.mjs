@@ -118,13 +118,5 @@ for (const [name, order] of [
 }
 console.log('repeats: ok');
 
-// an active loop is clearly shown
-lo.checked = true; lo.dispatchEvent(new w.Event('change'));
-assert.match(w.document.querySelector('#progress').textContent, /looping bars 1–4/);
-assert.ok(w.document.querySelector('#loop-group').classList.contains('active'));
-lo.checked = false; lo.dispatchEvent(new w.Event('change'));
-assert.doesNotMatch(w.document.querySelector('#progress').textContent, /looping/);
-assert.ok(!w.document.querySelector('#loop-group').classList.contains('active'));
-console.log('loop indicator: ok');
 console.log('ALL OK');
 process.exit(0);

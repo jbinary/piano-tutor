@@ -41,9 +41,11 @@ body {
   font-size: 15px;
 }
 
+/* Basis 0: the title only gets space left over by the controls, so it is cut off
+   with an ellipsis rather than pushing the toolbar onto a second row. */
 #toolbar .grow {
-  flex: 1;
-  min-width: 120px;
+  flex: 1 1 0;
+  min-width: 0;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -52,6 +54,8 @@ body {
 
 #toolbar .group {
   display: flex;
+  flex: none;
+  white-space: nowrap;
   align-items: center;
   gap: 4px;
 }
@@ -79,20 +83,17 @@ button:active { filter: brightness(1.3); }
   padding: 4px 6px;
 }
 
-#loop-group.active {
-  padding: 0 6px;
-  border-radius: 8px;
-  background: var(--left);
-}
-
 #toolbar input[type=checkbox] { width: 20px; height: 20px; vertical-align: middle; }
 
 .pill {
+  max-width: 14em;
   padding: 6px 10px;
   border-radius: 999px;
   background: var(--btn);
   cursor: pointer;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pill.connected { background: var(--ok); }
 
