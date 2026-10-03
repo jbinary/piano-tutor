@@ -204,7 +204,7 @@ function updateProgress() {
   $('#progress').textContent = !s
     ? ''
     : `Bar ${s.bar} · ${Math.round((100 * state.step) / Math.max(1, state.steps.length - 1))}%` +
-      (state.wrong ? ` · ${state.wrong} wrong` : '');
+      (state.wrong ? ` · ${state.wrong} ✗` : '');
 }
 
 let saveTimer;
@@ -372,7 +372,8 @@ function startMidi() {
     onNoteOn: noteOn,
     onNoteOff: noteOff,
     onStatus: (text, connected) => {
-      $('#midi-status').textContent = text;
+      // Short label keeps the toolbar on one row; the device name / reason is in the tooltip.
+      $('#midi-status').textContent = connected ? 'MIDI ✓' : 'MIDI ✗';
       $('#midi-status').title = `${text}\nTap to reconnect`;
       $('#midi-status').classList.toggle('connected', connected);
     },

@@ -12,13 +12,13 @@
 </head>
 <body>
   <header id="toolbar">
-    <button id="btn-library" title="Library">☰ Library</button>
+    <button id="btn-library" title="Library">☰</button>
     <span id="title" class="grow">No piece loaded</span>
 
     <div class="group" title="Which hand to practise">
-      <button data-hand="L">Left</button>
-      <button data-hand="both" class="on">Both</button>
-      <button data-hand="R">Right</button>
+      <button data-hand="L" title="Left hand only">L</button>
+      <button data-hand="both" class="on" title="Both hands">Both</button>
+      <button data-hand="R" title="Right hand only">R</button>
     </div>
 
     <div class="group">
@@ -28,7 +28,7 @@
     </div>
 
     <div class="group" title="Loop a range of bars">
-      <label><input type="checkbox" id="loop-on"> Loop bars</label>
+      <label title="Loop bars"><input type="checkbox" id="loop-on"> 🔁</label>
       <input type="number" id="loop-from" min="1" value="1" inputmode="numeric">
       <span>–</span>
       <input type="number" id="loop-to" min="1" value="4" inputmode="numeric">
@@ -40,7 +40,7 @@
     </div>
 
     <span id="progress"></span>
-    <span id="midi-status" class="pill" title="Tap to reconnect">MIDI: –</span>
+    <span id="midi-status" class="pill" title="Tap to reconnect">MIDI –</span>
   </header>
 
   <main id="score-wrap">
