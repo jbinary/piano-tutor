@@ -203,7 +203,8 @@ function updateProgress() {
   $('#progress').textContent = !s
     ? ''
     : `Bar ${s.bar} · ${Math.round((100 * state.step) / Math.max(1, state.steps.length - 1))}%` +
-      (state.wrong ? ` · ${state.wrong} wrong` : '');
+      (state.wrong ? ` · ${state.wrong} wrong` : '') +
+      (state.loop.on ? ` · 🔁 looping bars ${state.loop.from}–${state.loop.to}` : '');
 }
 
 let saveTimer;
@@ -260,6 +261,9 @@ function syncControls() {
   $('#loop-on').checked = state.loop.on;
   $('#loop-from').value = state.loop.from;
   $('#loop-to').value = state.loop.to;
+  $('#loop-group').classList.toggle('active', state.loop.on);
+  $('#btn-restart').title = state.loop.on ? `Back to bar ${state.loop.from} (loop start)` : 'Back to start';
+  updateProgress();
 }
 
 for (const b of document.querySelectorAll('[data-hand]')) {

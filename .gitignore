@@ -1,1 +1,6 @@
 node_modules/
+
+# Your own scores (often copyrighted) - keep them out of the public repo
+/*.mxl
+/*.musicxml
+/*.xml

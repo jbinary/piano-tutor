@@ -95,5 +95,36 @@ const f2 = new w.File([mxl], 'test.mxl'); f2.arrayBuffer = async () => mxl.buffe
 await t.addFile(f2);
 assert.equal(S.steps.length, 7); assert.equal(w.document.querySelector('#title').textContent, 'Wait Mode Test');
 console.log('mxl: ok');
+// repeats, 1st/2nd endings and D.C. al Fine are followed in playing order
+const loadSample = async (name) => {
+  const buf = fs.readFileSync(`${ROOT}/samples/${name}`);
+  const f = new w.File([buf], name);
+  f.arrayBuffer = async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length);
+  await t.addFile(f);
+};
+for (const [name, order] of [
+  ['test-repeat.musicxml', [1, 2, 3, 2, 3, 4]],
+  ['test-volta.musicxml', [1, 2, 3, 2, 4, 5]],
+  ['test-repeat-from-start.musicxml', [1, 2, 1, 2, 3]],
+  ['test-dc.musicxml', [1, 2, 3, 1, 2]],
+]) {
+  await loadSample(name);
+  assert.deepEqual([...S.steps.map((s) => s.bar)], order, name);
+  for (const st of [...S.steps]) for (const n of st.notes) play(n.midi);
+  assert.equal(S.finished, true, `${name} reaches the end`);
+  w.document.querySelector('#btn-restart').click();
+  assert.equal(S.step, 0);
+  assert.equal(t.osmd.cursor.iterator.CurrentMeasureIndex, 0, `${name} restart goes to bar 1`);
+}
+console.log('repeats: ok');
+
+// an active loop is clearly shown
+lo.checked = true; lo.dispatchEvent(new w.Event('change'));
+assert.match(w.document.querySelector('#progress').textContent, /looping bars 1–4/);
+assert.ok(w.document.querySelector('#loop-group').classList.contains('active'));
+lo.checked = false; lo.dispatchEvent(new w.Event('change'));
+assert.doesNotMatch(w.document.querySelector('#progress').textContent, /looping/);
+assert.ok(!w.document.querySelector('#loop-group').classList.contains('active'));
+console.log('loop indicator: ok');
 console.log('ALL OK');
 process.exit(0);
