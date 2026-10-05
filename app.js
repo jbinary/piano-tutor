@@ -3,7 +3,7 @@
 import { Keyboard } from './keyboard.js';
 import { connectMidi } from './midi.js';
 import * as library from './library.js';
-import { drawMark, marksLayer, pitchDiatonic } from './marks.js';
+import { diatonic, drawMark, marksLayer, notePosition, spelledDiatonic, wrongAlter } from './marks.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -14,17 +14,19 @@ const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('score', {
   drawPartAbbreviations: false,
   cursorsOptions: [{ type: 0, color: '#2563eb', alpha: 0.35, follow: false }],
 });
+osmd.TransposeCalculator = new opensheetmusicdisplay.TransposeCalculator();
 
 const keyboard = new Keyboard($('#keyboard'), { onNoteOn: noteOn, onNoteOff: noteOff });
 
 const state = {
   scoreId: null,
-  /** @type {{bar:number, measureIndex:number, notes:{midi:number, hand:'L'|'R', staffId:number, diatonic:number, alter:number}[]}[]} one entry per cursor position */
+  /** @type {{bar:number, measureIndex:number, notes:{midi:number, hand:'L'|'R', source:object, fund:number, alter:number}[]}[]} one entry per cursor position */
   steps: [],
   step: 0,
   cursorStep: 0, // where the OSMD cursor actually is
   hand: 'both',
   zoom: 1,
+  transpose: 0, // semitones
   loop: { on: false, from: 1, to: 4 },
   satisfied: new Set(), // notes of the current step pressed and still held
   held: new Set(),
@@ -74,6 +76,7 @@ async function openScore(id) {
   const saved = (await library.getProgress(id)) ?? {};
   state.hand = saved.hand ?? 'both';
   state.zoom = saved.zoom ?? 1;
+  state.transpose = saved.transpose ?? 0;
   state.loop = saved.loop ?? { on: false, from: 1, to: 4 };
 
   $('#empty').hidden = true;
@@ -84,23 +87,37 @@ async function openScore(id) {
   } catch {}
 
   osmd.zoom = state.zoom;
-  osmd.render();
-  osmd.cursor.show();
-  state.steps = collectSteps();
-  state.cursorStep = 0;
-  clearMarks();
+  if (state.transpose) {
+    osmd.Sheet.Transpose = state.transpose;
+    osmd.updateGraphic();
+  }
+  renderScore();
   state.wrong = 0;
-
-  const all = state.steps.flatMap((s) => s.notes.map((n) => n.midi));
-  if (all.length) keyboard.setRange(Math.min(...all), Math.max(...all));
 
   syncControls();
   const start = Math.min(saved.step ?? 0, state.steps.length - 1);
   goTo(nextPlayable(Math.max(start, 0)) ?? firstPlayable());
 }
 
-/** MIDI note number of an OSMD note (OSMD's halfTone is 12 below MIDI). */
-const noteMidi = (note) => note.halfTone + 12;
+/** Draw the score and (re)read the notes to play, which change with transposition. */
+function renderScore() {
+  osmd.render();
+  osmd.cursor.show();
+  state.steps = collectSteps();
+  state.cursorStep = 0;
+  clearMarks();
+  const all = state.steps.flatMap((s) => s.notes.map((n) => n.midi));
+  if (all.length) keyboard.setRange(Math.min(...all), Math.max(...all));
+}
+
+/**
+ * MIDI key for an OSMD note, transposed. Computed from the sounding pitch (OSMD: C4 is octave 1)
+ * rather than OSMD's halfTone, which loses 8va/8vb lines once the score is transposed.
+ */
+const noteMidi = (note) => {
+  const p = note.Pitch;
+  return (p.Octave + 4) * 12 + p.FundamentalNote + p.AccidentalHalfTones + state.transpose;
+};
 
 /** Walk the cursor through the whole piece once and record which keys start at each position. */
 function collectSteps() {
@@ -118,7 +135,11 @@ function collectSteps() {
         // A tied continuation is held, not struck again.
         if (note.NoteTie && note.NoteTie.StartNote !== note) continue;
         const midi = noteMidi(note);
-        if (!notes.has(midi)) notes.set(midi, { midi, hand, staffId: staff.idInMusicSheet, diatonic: pitchDiatonic(note.Pitch), alter: note.Pitch.AccidentalHalfTones });
+        // Spelling as drawn (TransposedPitch can be left over from an earlier transposition).
+        const written = (state.transpose && note.TransposedPitch) || note.Pitch;
+        if (!notes.has(midi)) {
+          notes.set(midi, { midi, hand, source: note, fund: written.FundamentalNote, alter: written.AccidentalHalfTones });
+        }
       }
     }
     const measureIndex = cursor.iterator.CurrentMeasureIndex;
@@ -222,7 +243,7 @@ function saveProgressSoon() {
   const id = state.scoreId;
   saveTimer = setTimeout(() => {
     if (id === null) return;
-    library.saveProgress(id, { step: state.step, hand: state.hand, zoom: state.zoom, loop: state.loop });
+    library.saveProgress(id, { step: state.step, hand: state.hand, zoom: state.zoom, transpose: state.transpose, loop: state.loop });
   }, 500);
 }
 
@@ -255,8 +276,18 @@ function addMark(midi, targets) {
   const layer = marksLayer(osmd);
   if (state.marks.has(midi) || !targets.length || !layer) return;
   const nearest = targets.reduce((a, b) => (Math.abs(b.midi - midi) < Math.abs(a.midi - midi) ? b : a));
-  const { measureIndex } = state.steps[state.step];
-  state.marks.set(midi, drawMark(layer, osmd, { x: cursorX(), measureIndex, staffId: nearest.staffId, midi }));
+  const at = drawnPosition(nearest);
+  if (!at) return;
+  // Same staff as that note, moved by the number of staff steps between the two pitches.
+  const steps = spelledDiatonic(nearest.midi, nearest.fund, nearest.alter) - diatonic(midi);
+  const y = at.y + steps / 2;
+  state.marks.set(midi, drawMark(layer, osmd, { x: cursorX(), y, staffTop: at.staffTop, alter: wrongAlter(midi), kind: 'wrong' }));
+}
+
+/** Where a note at the cursor is drawn (see notePosition), or null if OSMD didn't draw it. */
+function drawnPosition(note) {
+  const g = osmd.cursor.GNotesUnderCursor().find((gn) => gn.sourceNote === note.source);
+  return g ? notePosition(g) : null;
 }
 
 /** Horizontal centre of the cursor in page px, which is where its notes are drawn. */
@@ -276,10 +307,10 @@ function syncCorrectMarks() {
   state.correctMarks = [];
   const layer = marksLayer(osmd);
   if (!state.satisfied.size || !layer) return;
-  const { measureIndex } = state.steps[state.step];
   const x = cursorX();
   for (const n of required(state.step)) {
-    if (state.satisfied.has(n.midi)) state.correctMarks.push(...drawMark(layer, osmd, { ...n, x, measureIndex, kind: 'correct' }));
+    const at = state.satisfied.has(n.midi) && drawnPosition(n);
+    if (at) state.correctMarks.push(...drawMark(layer, osmd, { x, ...at, alter: n.alter, kind: 'correct' }));
   }
 }
 
@@ -317,6 +348,7 @@ function syncControls() {
   $('#loop-on').checked = state.loop.on;
   $('#loop-from').value = state.loop.from;
   $('#loop-to').value = state.loop.to;
+  $('#transpose').value = String(state.transpose);
 }
 
 for (const b of document.querySelectorAll('[data-hand]')) {
@@ -366,6 +398,23 @@ function setZoom(z) {
 }
 $('#btn-zoom-in').addEventListener('click', () => setZoom(state.zoom + 0.1));
 $('#btn-zoom-out').addEventListener('click', () => setZoom(state.zoom - 0.1));
+
+// Transposition keeps the piece's structure, so the cursor stays on the same step.
+function setTranspose(semitones) {
+  if (!state.steps.length) return;
+  state.transpose = semitones;
+  osmd.Sheet.Transpose = semitones;
+  osmd.updateGraphic();
+  renderScore();
+  syncControls();
+  goTo(Math.min(state.step, state.steps.length - 1));
+  saveProgressSoon();
+}
+for (let n = 12; n >= -12; n--) {
+  const label = n === 0 ? '±0' : `${n > 0 ? '+' : '−'}${Math.abs(n)}`;
+  $('#transpose').append(new Option(`Tr ${label}`, String(n), n === 0, n === 0));
+}
+$('#transpose').addEventListener('change', (e) => setTranspose(Number(e.target.value)));
 
 /** Re-render the score and put the cursor back where it was. */
 function rerender() {

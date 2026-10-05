@@ -182,8 +182,9 @@ const top1 = t.osmd.GraphicSheet.MeasureList[1][0].ParentStaffLine.PositionAndSh
 assert.equal(centreY(blues()[0]), top1 + (38 - 31) * 5);
 assert.equal(layer().querySelector('.mark-sharp.correct')?.textContent, '♯');
 t.noteOff(66); t.noteOff(70);
-const { pitchDiatonic } = await import(`${ROOT}/marks.js`);
-assert.equal(pitchDiatonic({ Octave: 1, FundamentalNote: 11 }), 34, 'Bb4 is written on the B line');
+const { spelledDiatonic } = await import(`${ROOT}/marks.js`);
+assert.equal(spelledDiatonic(70, 11, -1), 34, 'Bb4 is written on the B line');
+assert.equal(spelledDiatonic(72, 11, 1), 34, 'B#4 is the same key as C5 but on the B line');
 console.log('wrong-note marks: ok');
 // the on-screen keyboard can be hidden, and that is remembered
 const keysBtn = w.document.querySelector('#btn-keys');
@@ -197,5 +198,49 @@ keysBtn.click();
 assert.equal(w.document.querySelector('#keyboard').hidden, false);
 assert.ok(keysBtn.classList.contains('on'));
 console.log('hide keyboard: ok');
+// transposition: the score and the notes to play move together, and it is saved per piece
+await loadSample('test-two-hands.musicxml');
+const tr = w.document.querySelector('#transpose');
+const setTr = (n) => { tr.value = String(n); tr.dispatchEvent(new w.Event('change')); };
+const midis = () => [...S.steps.map((st) => st.notes.map((n) => n.midi).join(' '))];
+const { spelledDiatonic: sd } = await import(`${ROOT}/marks.js`);
+const spelled = (i) => [...S.steps[i].notes.map((n) => `${sd(n.midi, n.fund, n.alter)}/${n.alter}`)];
+assert.equal(tr.value, '0');
+w.document.querySelector('#btn-next').click(); // stay on the same step through transposing
+setTr(2);
+assert.deepEqual(midis(), ['62 50', '64', '66 45', '62 66 69', '68 50', '', '']);
+assert.equal(S.step, 1, 'cursor stays put');
+play(62); assert.equal(S.step, 1, 'the untransposed note is now wrong'); assert.equal(S.wrong, 1);
+play(64); assert.equal(S.step, 2);
+assert.deepEqual(spelled(0), ['29/0', '22/0'], 'C becomes D on the staff');
+assert.deepEqual(spelled(2), ['31/1', '19/0'], 'E becomes F#, G2 becomes A2');
+setTr(-1);
+assert.deepEqual(midis(), ['59 47', '61', '63 42', '59 63 66', '65 47', '', '']);
+assert.deepEqual(spelled(4), ['31/0', '20/0'], 'F# becomes F natural, C3 becomes B2');
+setTr(0);
+assert.deepEqual(midis(), ['60 48', '62', '64 43', '60 64 67', '66 48', '', '']);
+assert.deepEqual(spelled(0), ['28/0', '21/0'], 'back to the written spelling');
+setTr(2);
+await new Promise((r) => setTimeout(r, 700));
+await t.openScore(S.scoreId);
+assert.equal(tr.value, '2', 'transpose restored on reopening');
+assert.equal(S.steps[0].notes[0].midi, 62);
+console.log('transpose: ok');
+
+// notes under an 8va line: the keys are the sounding pitches (also when transposed), and the dots
+// are drawn where the notes are written, an octave lower
+await loadSample('test-8va.musicxml');
+assert.deepEqual(midis(), ['83 88', '79']);
+const top8 = t.osmd.GraphicSheet.MeasureList[0][0].ParentStaffLine.PositionAndShape.AbsolutePosition.y * 10;
+t.noteOn(83); // B5 held, E6 missing: blue dot on the B4 line (4 half-spaces below the top line)
+assert.equal(centreY(blues()[0]), top8 + 4 * 5);
+t.noteOn(84); // wrong C6: red dot on the C5 space
+assert.equal(centreY(dots().find((d) => !d.classList.contains('correct'))), top8 + 3 * 5);
+t.noteOff(84); t.noteOff(83);
+setTr(3);
+assert.deepEqual(midis(), ['86 91', '82'], 'transposing keeps the 8va');
+setTr(-12);
+assert.deepEqual(midis(), ['71 76', '67']);
+console.log('8va: ok');
 console.log('ALL OK');
 process.exit(0);
