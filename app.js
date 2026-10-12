@@ -134,16 +134,28 @@ function chordHeldOver(ve) {
   return new Set(ve.Notes.filter((n) => n.Pitch && pitches.has(noteMidi(n))).map(noteMidi));
 }
 
+/**
+ * The parts to play: the piano ones (two staves) when the score has any, so a vocal line printed
+ * above the piano isn't asked for; otherwise every part.
+ */
+function pianoParts() {
+  const all = osmd.Sheet.Instruments;
+  const piano = all.filter((i) => i.Staves.length >= 2);
+  return new Set(piano.length ? piano : all);
+}
+
 /** Walk the cursor through the whole piece once and record which keys start at each position. */
 function collectSteps() {
   const cursor = osmd.cursor;
   const steps = [];
+  const parts = pianoParts();
   cursor.reset();
   while (!cursor.iterator.EndReached) {
     const notes = new Map();
     for (const ve of cursor.iterator.CurrentVoiceEntries ?? []) {
       if (ve.IsGrace) continue;
       const staff = ve.ParentSourceStaffEntry.ParentStaff;
+      if (!parts.has(staff.ParentInstrument)) continue;
       const hand = staff.ParentInstrument.Staves.indexOf(staff) === 0 ? 'R' : 'L';
       const held = chordHeldOver(ve);
       for (const note of ve.Notes) {

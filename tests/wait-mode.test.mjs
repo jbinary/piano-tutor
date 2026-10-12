@@ -253,5 +253,11 @@ setTr(0);
 await loadSample('test-chord-tie.musicxml');
 assert.deepEqual(midis(), ['65 74 50', '57', '76 50']);
 console.log('chord tie: ok');
+
+// a vocal part printed above the piano is not played
+await loadSample('test-voice-and-piano.musicxml');
+assert.deepEqual([...S.steps.map(fmt)], ['R64 L48', '-', 'R67'], 'the B4 sung alone is skipped');
+assert.deepEqual(midis().filter(Boolean), ['64 48', '67']);
+console.log('voice part: ok');
 console.log('ALL OK');
 process.exit(0);
