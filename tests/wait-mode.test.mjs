@@ -242,5 +242,11 @@ assert.deepEqual(midis(), ['86 91', '82'], 'transposing keeps the 8va');
 setTr(-12);
 assert.deepEqual(midis(), ['71 76', '67']);
 console.log('8va: ok');
+
+// a chord with only one note tied: the whole chord is held, only the other hand plays
+setTr(0);
+await loadSample('test-chord-tie.musicxml');
+assert.deepEqual(midis(), ['65 74 50', '57', '76 50']);
+console.log('chord tie: ok');
 console.log('ALL OK');
 process.exit(0);

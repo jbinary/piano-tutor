@@ -119,6 +119,20 @@ const noteMidi = (note) => {
   return (p.Octave + 4) * 12 + p.FundamentalNote + p.AccidentalHalfTones + state.transpose;
 };
 
+/**
+ * Keys of a chord that are held over from the chord before it: when any note of the chord is a
+ * tied continuation, its other notes that repeat a pitch of the chord it's tied from count as tied
+ * too (scores often tie just one note of a chord).
+ */
+function chordHeldOver(ve) {
+  const cont = ve.Notes.find((n) => n.NoteTie && n.NoteTie.StartNote !== n);
+  if (!cont) return new Set();
+  const tied = cont.NoteTie.Notes;
+  const from = tied[tied.indexOf(cont) - 1]?.ParentVoiceEntry;
+  const pitches = new Set((from?.Notes ?? []).filter((n) => n.Pitch).map(noteMidi));
+  return new Set(ve.Notes.filter((n) => n.Pitch && pitches.has(noteMidi(n))).map(noteMidi));
+}
+
 /** Walk the cursor through the whole piece once and record which keys start at each position. */
 function collectSteps() {
   const cursor = osmd.cursor;
@@ -130,10 +144,12 @@ function collectSteps() {
       if (ve.IsGrace) continue;
       const staff = ve.ParentSourceStaffEntry.ParentStaff;
       const hand = staff.ParentInstrument.Staves.indexOf(staff) === 0 ? 'R' : 'L';
+      const held = chordHeldOver(ve);
       for (const note of ve.Notes) {
         if (note.isRest() || !note.Pitch) continue;
         // A tied continuation is held, not struck again.
         if (note.NoteTie && note.NoteTie.StartNote !== note) continue;
+        if (held.has(noteMidi(note))) continue;
         const midi = noteMidi(note);
         // Spelling as drawn (TransposedPitch can be left over from an earlier transposition).
         const written = (state.transpose && note.TransposedPitch) || note.Pitch;
