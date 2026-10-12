@@ -74,8 +74,13 @@ w.document.querySelector('#loop-to').value = '1';
 w.document.querySelector('#loop-to').dispatchEvent(new w.Event('change'));
 const lo = w.document.querySelector('#loop-on'); lo.checked = true; lo.dispatchEvent(new w.Event('change'));
 assert.equal(S.step, 0);
-play(60, 48); play(62); play(64, 43); play(60, 64, 67);
+play(60, 48); play(62); play(61); play(64, 43); play(60, 64, 67);
 assert.equal(S.step, 0, 'looped back'); assert.equal(cursorBar(), 0);
+const stats = w.document.querySelector('#pass-stats');
+assert.equal(stats.hidden, false);
+assert.equal(stats.textContent, '🔁 1 wrong · 11% of 9 notes played');
+assert.equal(S.wrong, 0, 'wrong count reset on each loop'); assert.equal(S.played, 0);
+assert.ok(!w.document.querySelector('#progress').textContent.includes('✗'));
 console.log('loop: ok');
 
 // prev/next buttons and cursor sync

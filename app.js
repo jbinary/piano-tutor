@@ -30,7 +30,8 @@ const state = {
   loop: { on: false, from: 1, to: 4 },
   satisfied: new Set(), // notes of the current step pressed and still held
   held: new Set(),
-  wrong: 0,
+  wrong: 0, // wrong keys pressed in this pass
+  played: 0, // notes played right in this pass
   /** Elements drawn on the score for each wrong key currently held. @type {Map<number, HTMLElement[]>} */
   marks: new Map(),
   /** Blue marks for the correct keys held while the step is not yet complete. @type {HTMLElement[]} */
@@ -92,7 +93,7 @@ async function openScore(id) {
     osmd.updateGraphic();
   }
   renderScore();
-  state.wrong = 0;
+  resetStats();
 
   syncControls();
   const start = Math.min(saved.step ?? 0, state.steps.length - 1);
@@ -216,8 +217,13 @@ function goTo(i) {
 }
 
 function advance() {
+  state.played += required(state.step).length;
   let next = nextPlayable(state.step + 1);
-  if (state.loop.on && (next === null || state.steps[next].bar > state.loop.to)) next = firstPlayable();
+  if (state.loop.on && (next === null || state.steps[next].bar > state.loop.to)) {
+    next = firstPlayable();
+    showPassStats();
+    resetStats();
+  }
   if (next === null) finish();
   else goTo(next);
 }
@@ -243,6 +249,26 @@ function scrollToCursor() {
   if (r.top < w.top + 20 || r.bottom > w.bottom - 20) {
     wrap.scrollTo({ top: wrap.scrollTop + r.top - w.top - wrap.clientHeight / 4, behavior: 'smooth' });
   }
+}
+
+function resetStats() {
+  state.wrong = 0;
+  state.played = 0;
+  updateProgress();
+}
+
+/** Briefly show how many wrong keys the pass just finished had, out of all keys pressed in it. */
+let statsTimer;
+function showPassStats() {
+  const total = state.played + state.wrong;
+  const pct = Math.round((100 * state.wrong) / Math.max(1, total));
+  const el = $('#pass-stats');
+  el.textContent = state.wrong
+    ? `🔁 ${state.wrong} wrong · ${pct}% of ${total} notes played`
+    : `🔁 No wrong notes · ${total} played 🎉`;
+  el.hidden = false;
+  clearTimeout(statsTimer);
+  statsTimer = setTimeout(() => { el.hidden = true; }, 5000);
 }
 
 function updateProgress() {
@@ -384,21 +410,27 @@ function readLoop() {
 }
 $('#loop-on').addEventListener('change', () => {
   readLoop();
-  if (state.loop.on) goTo(firstPlayable());
+  if (state.loop.on) {
+    resetStats();
+    goTo(firstPlayable());
+  }
 });
 $('#loop-from').addEventListener('change', () => {
   readLoop();
-  if (state.loop.on) goTo(firstPlayable());
+  if (state.loop.on) {
+    resetStats();
+    goTo(firstPlayable());
+  }
 });
 $('#loop-to').addEventListener('change', readLoop);
 
 $('#btn-restart').addEventListener('click', () => {
-  state.wrong = 0;
+  resetStats();
   clearMarks();
   goTo(firstPlayable());
 });
 $('#btn-again').addEventListener('click', () => {
-  state.wrong = 0;
+  resetStats();
   clearMarks();
   goTo(firstPlayable());
 });
