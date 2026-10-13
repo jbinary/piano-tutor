@@ -36,7 +36,6 @@ const state = {
   marks: new Map(),
   /** Blue marks for the correct keys held while the step is not yet complete. @type {HTMLElement[]} */
   correctMarks: [],
-  finished: false,
 };
 
 // ---------------------------------------------------------------- score loading
@@ -215,8 +214,6 @@ function moveCursor(i) {
 
 function goTo(i) {
   if (!state.steps.length) return;
-  state.finished = false;
-  $('#done').hidden = true;
   state.step = i;
   moveCursor(i);
   state.satisfied.clear();
@@ -231,25 +228,18 @@ function goTo(i) {
 function advance() {
   state.played += required(state.step).length;
   let next = nextPlayable(state.step + 1);
-  if (state.loop.on && (next === null || state.steps[next].bar > state.loop.to)) {
+  // The end of the loop, or of the piece, starts the next pass from the beginning.
+  if (next === null || (state.loop.on && state.steps[next].bar > state.loop.to)) {
     next = firstPlayable();
     showPassStats();
     resetStats();
   }
-  if (next === null) finish();
-  else goTo(next);
+  goTo(next);
 }
 
 function back() {
   const prev = nextPlayable(state.step - 1, -1);
   if (prev !== null) goTo(prev);
-}
-
-function finish() {
-  state.finished = true;
-  keyboard.setTargets([]);
-  $('#done').hidden = false;
-  updateProgress();
 }
 
 function scrollToCursor() {
@@ -307,7 +297,7 @@ function noteOn(midi) {
   state.held.add(midi);
   keyboard.setHeld(midi, true);
   keepAwake();
-  if (!state.steps.length || state.finished) return;
+  if (!state.steps.length) return;
 
   const targets = required(state.step);
   if (targets.some((n) => n.midi === midi)) {
@@ -441,13 +431,8 @@ $('#btn-restart').addEventListener('click', () => {
   clearMarks();
   goTo(firstPlayable());
 });
-$('#btn-again').addEventListener('click', () => {
-  resetStats();
-  clearMarks();
-  goTo(firstPlayable());
-});
 $('#btn-prev').addEventListener('click', back);
-$('#btn-next').addEventListener('click', () => state.steps.length && !state.finished && advance());
+$('#btn-next').addEventListener('click', () => state.steps.length && advance());
 
 function setZoom(z) {
   if (!state.steps.length) return;

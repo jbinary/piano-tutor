@@ -37,6 +37,14 @@ assert.equal(S.step, 0);
 
 const play = (...ns) => { for (const n of ns) t.noteOn(n); for (const n of ns) t.noteOff(n); };
 const cursorBar = () => t.osmd.cursor.iterator.CurrentMeasureIndex;
+const statsEl = w.document.querySelector('#pass-stats');
+/** The piece ended: its stats pop up and it starts again from the beginning. */
+const startedOver = (msg) => {
+  assert.equal(statsEl.hidden, false, `${msg}: stats shown`);
+  assert.equal(S.step, 0, `${msg}: back to the start`);
+  assert.equal(S.wrong, 0); assert.equal(S.played, 0);
+  statsEl.hidden = true;
+};
 
 play(60); assert.equal(S.step, 0, 'needs both hands');
 play(61); assert.equal(S.wrong, 1);
@@ -51,7 +59,9 @@ assert.equal(S.step, 3, 'a chord note released early does not count');
 assert.ok(!w.document.querySelector('[data-midi="60"]').classList.contains('ok'), 'released chord note loses its green');
 t.noteOn(60); assert.equal(S.step, 4, 'all held together'); assert.equal(cursorBar(), 1);
 t.noteOff(60); t.noteOff(64); t.noteOff(67);
-play(66, 48); assert.equal(S.finished, true);
+play(66, 48);
+startedOver('both hands');
+assert.equal(cursorBar(), 0);
 console.log('both hands: ok');
 
 // right hand only
@@ -59,13 +69,15 @@ w.document.querySelector('[data-hand=R]').click();
 w.document.querySelector('#btn-restart').click();
 assert.equal(S.step, 0); assert.equal(S.wrong, 0);
 play(60); play(62); play(64); play(60, 64, 67);
-assert.equal(S.step, 4); play(66); assert.equal(S.finished, true);
+assert.equal(S.step, 4); play(66); startedOver('right hand');
 console.log('right hand: ok');
 
 // left hand only: steps 0, 2, 4
 w.document.querySelector('[data-hand=L]').click();
 w.document.querySelector('#btn-restart').click();
-play(48); assert.equal(S.step, 2); play(43); assert.equal(S.step, 4); play(48); assert.equal(S.finished, true);
+play(48); assert.equal(S.step, 2); play(43); assert.equal(S.step, 4); play(48);
+assert.equal(statsEl.textContent, '🔁 No wrong notes · 3 played 🎉');
+startedOver('left hand');
 console.log('left hand: ok');
 
 // loop bar 1 with both hands
@@ -76,7 +88,7 @@ const lo = w.document.querySelector('#loop-on'); lo.checked = true; lo.dispatchE
 assert.equal(S.step, 0);
 play(60, 48); play(62); play(61); play(64, 43); play(60, 64, 67);
 assert.equal(S.step, 0, 'looped back'); assert.equal(cursorBar(), 0);
-const stats = w.document.querySelector('#pass-stats');
+const stats = statsEl;
 assert.equal(stats.hidden, false);
 assert.equal(stats.textContent, '🔁 1 wrong · 11% of 9 notes played');
 assert.equal(S.wrong, 0, 'wrong count reset on each loop'); assert.equal(S.played, 0);
@@ -122,9 +134,7 @@ for (const [name, order] of [
   await loadSample(name);
   assert.deepEqual([...S.steps.map((s) => s.bar)], order, name);
   for (const st of [...S.steps]) for (const n of st.notes) play(n.midi);
-  assert.equal(S.finished, true, `${name} reaches the end`);
-  w.document.querySelector('#btn-restart').click();
-  assert.equal(S.step, 0);
+  startedOver(name);
   assert.equal(t.osmd.cursor.iterator.CurrentMeasureIndex, 0, `${name} restart goes to bar 1`);
 }
 console.log('repeats: ok');
