@@ -273,12 +273,23 @@ function showPassStats() {
   statsTimer = setTimeout(() => { el.hidden = true; }, 5000);
 }
 
+/**
+ * Bar, percent and wrong count each get a fixed width, so the toolbar doesn't shift as numbers
+ * grow by a digit (which looks like something just went wrong).
+ */
 function updateProgress() {
   const s = state.steps[state.step];
-  $('#progress').textContent = !s
-    ? ''
-    : `Bar ${s.bar} · ${Math.round((100 * state.step) / Math.max(1, state.steps.length - 1))}%` +
-      (state.wrong ? ` · ${state.wrong} ✗` : '');
+  const el = $('#progress');
+  if (!s) {
+    el.textContent = '';
+    return;
+  }
+  const lastBar = Math.max(...state.steps.map((st) => st.bar));
+  const pct = Math.round((100 * state.step) / Math.max(1, state.steps.length - 1));
+  el.innerHTML =
+    `Bar <span class="num" style="width:${String(lastBar).length}ch">${s.bar}</span> · ` +
+    `<span class="num" style="width:3ch">${pct}</span>% ` +
+    `<span class="wrong-count">${state.wrong ? `· ${state.wrong} ✗` : ''}</span>`;
 }
 
 let saveTimer;

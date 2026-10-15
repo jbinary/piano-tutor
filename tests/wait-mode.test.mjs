@@ -93,6 +93,9 @@ assert.equal(stats.hidden, false);
 assert.equal(stats.textContent, '🔁 1 wrong · 11% of 9 notes played');
 assert.equal(S.wrong, 0, 'wrong count reset on each loop'); assert.equal(S.played, 0);
 assert.ok(!w.document.querySelector('#progress').textContent.includes('✗'));
+play(61);
+assert.equal(w.document.querySelector('#progress').textContent, 'Bar 1 · 0% · 1 ✗');
+assert.equal(w.document.querySelector('#progress .num').style.width, '1ch', 'bar number sized for the last bar');
 console.log('loop: ok');
 
 // prev/next buttons and cursor sync

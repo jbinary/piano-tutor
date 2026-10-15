@@ -108,7 +108,9 @@ button:active { filter: brightness(1.3); }
 }
 .pill.connected { background: var(--ok); }
 
-#progress { opacity: .8; white-space: nowrap; }
+#progress { opacity: .8; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#progress .num { display: inline-block; text-align: right; }
+#progress .wrong-count { display: inline-block; min-width: 6ch; }
 
 /* ---------- score ---------- */
 
