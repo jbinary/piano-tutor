@@ -32,6 +32,10 @@ const state = {
   held: new Set(),
   wrong: 0, // wrong keys pressed in this pass
   played: 0, // notes played right in this pass
+  /** Seconds this pass took to play, and would take at the written tempo. */
+  time: { played: 0, written: 0 },
+  /** When the last step was completed by playing it, to time the next one. @type {{step:number, at:number}|null} */
+  lastDone: null,
   /** Elements drawn on the score for each wrong key currently held. @type {Map<number, HTMLElement[]>} */
   marks: new Map(),
   /** Blue marks for the correct keys held while the step is not yet complete. @type {HTMLElement[]} */
@@ -171,11 +175,22 @@ function collectSteps() {
       }
     }
     const measureIndex = cursor.iterator.CurrentMeasureIndex;
-    const bar = osmd.Sheet.SourceMeasures[measureIndex]?.MeasureNumber ?? measureIndex + 1;
-    steps.push({ bar, measureIndex, notes: [...notes.values()] });
+    const measure = osmd.Sheet.SourceMeasures[measureIndex];
+    const bar = measure?.MeasureNumber ?? measureIndex + 1;
+    const time = cursor.iterator.currentTimeStamp.RealValue; // in whole notes, without repeats
+    const measureEnd = measure ? measure.AbsoluteTimestamp.RealValue + measure.Duration.RealValue : time;
+    const bpm = measure?.TempoInBPM || osmd.Sheet.DefaultStartTempoInBpm || 100;
+    steps.push({ bar, measureIndex, notes: [...notes.values()], time, measureEnd, bpm, seconds: 0 });
     cursor.next();
   }
   cursor.reset();
+  // How long each step lasts at the written tempo (quarter-note beats): until the next step, or
+  // the end of its bar when the next step is a jump back (repeat) or ahead (skipped ending).
+  steps.forEach((st, i) => {
+    const next = steps[i + 1]?.time ?? Infinity;
+    const whole = Math.min(next > st.time ? next - st.time : Infinity, st.measureEnd - st.time);
+    st.seconds = ((whole * 4) / st.bpm) * 60;
+  });
   return steps;
 }
 
@@ -227,6 +242,7 @@ function goTo(i) {
 
 function advance() {
   state.played += required(state.step).length;
+  timeStep();
   let next = nextPlayable(state.step + 1);
   // The end of the loop, or of the piece, starts the next pass from the beginning.
   if (next === null || (state.loop.on && state.steps[next].bar > state.loop.to)) {
@@ -253,21 +269,61 @@ function scrollToCursor() {
   }
 }
 
+/**
+ * Add the time since the previous completed step to the pass, next to how long the same notes
+ * last at the written tempo. A long pause (walking away) counts as at most 3× the written time, or
+ * 10 s; jumping around with the buttons starts timing afresh.
+ */
+function timeStep() {
+  const now = performance.now();
+  const last = state.lastDone;
+  if (last && state.step > last.step) {
+    let written = 0;
+    for (let k = last.step; k < state.step; k++) written += state.steps[k].seconds;
+    state.time.written += written;
+    state.time.played += Math.min((now - last.at) / 1000, Math.max(10, 3 * written));
+  }
+  state.lastDone = { step: state.step, at: now };
+}
+
 function resetStats() {
   state.wrong = 0;
   state.played = 0;
+  state.time = { played: 0, written: 0 };
+  state.lastDone = null;
   updateProgress();
 }
 
-/** Briefly show how many wrong keys the pass just finished had, out of all keys pressed in it. */
+/**
+ * The pass's score out of 100: accuracy (right keys out of all keys pressed) squared, so mistakes
+ * weigh more than slowness, times speed (share of the written tempo, at most 1).
+ */
+function passScore({ played, wrong, time }) {
+  const accuracy = played / Math.max(1, played + wrong);
+  const tempo = time.played > 0 ? Math.min(1, time.written / time.played) : 1;
+  return Math.round(100 * accuracy * accuracy * tempo);
+}
+
+const clock = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+
+/** Briefly show the pass's score, with the wrong keys, time and tempo it's made from. */
 let statsTimer;
 function showPassStats() {
   const total = state.played + state.wrong;
   const pct = Math.round((100 * state.wrong) / Math.max(1, total));
+  const { played, written } = state.time;
   const el = $('#pass-stats');
-  el.textContent = state.wrong
-    ? `🔁 ${state.wrong} wrong · ${pct}% of ${total} notes played`
-    : `🔁 No wrong notes · ${total} played 🎉`;
+  const details = [
+    state.wrong ? `${state.wrong} wrong · ${pct}% of ${total} notes played` : `No wrong notes · ${total} played 🎉`,
+  ];
+  if (played > 0) details.push(`${clock(played)} · ${Math.round((100 * written) / played)}% of tempo`);
+  el.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'score';
+  head.textContent = `🔁 Score ${passScore(state)}`;
+  const body = document.createElement('div');
+  body.textContent = details.join(' · ');
+  el.append(head, body);
   el.hidden = false;
   clearTimeout(statsTimer);
   statsTimer = setTimeout(() => { el.hidden = true; }, 5000);
