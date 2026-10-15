@@ -163,6 +163,24 @@ for (const [name, order] of [
   startedOver(name);
   assert.equal(t.osmd.cursor.iterator.CurrentMeasureIndex, 0, `${name} restart goes to bar 1`);
 }
+// a loop ending where the score's repeat ends doesn't play the repeat too
+await loadSample('test-repeat.musicxml'); // bars 1 2 3 2 3 4
+const loopTo = (a, b) => {
+  w.document.querySelector('#loop-from').value = a; w.document.querySelector('#loop-to').value = b;
+  w.document.querySelector('#loop-to').dispatchEvent(new w.Event('change'));
+  lo.checked = true; lo.dispatchEvent(new w.Event('change'));
+};
+loopTo(2, 3);
+assert.equal(S.step, 1);
+statsEl.hidden = true;
+for (const k of [1, 2]) for (const n of S.steps[k].notes) play(n.midi);
+assert.equal(S.step, 1, 'back to bar 2 after one pass'); assert.equal(statsEl.hidden, false);
+// a repeat inside the loop is still played
+loopTo(1, 4);
+statsEl.hidden = true;
+for (const k of [0, 1, 2, 3]) for (const n of S.steps[k].notes) play(n.midi);
+assert.equal(S.step, 4, 'the repeat inside the loop'); assert.equal(statsEl.hidden, true);
+lo.checked = false; lo.dispatchEvent(new w.Event('change'));
 console.log('repeats: ok');
 
 // held wrong notes are marked on the score at the right pitch and staff, and vanish on release

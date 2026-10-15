@@ -250,12 +250,24 @@ function advance() {
   timeStep();
   let next = nextPlayable(state.step + 1);
   // The end of the loop, or of the piece, starts the next pass from the beginning.
-  if (next === null || (state.loop.on && state.steps[next].bar > state.loop.to)) {
+  if (next === null || (state.loop.on && leavesLoop(state.step, next))) {
     next = firstPlayable();
     showPassStats();
     resetStats();
   }
   goTo(next);
+}
+
+/**
+ * Whether going from step `from` to `to` leaves the loop: past its last bar, or out of its last
+ * bar in any direction, so a repeat in the score that ends on that bar isn't played as well.
+ */
+function leavesLoop(from, to) {
+  for (let k = from + 1; k <= to; k++) {
+    const bar = state.steps[k].bar;
+    if (bar > state.loop.to || (state.steps[k - 1].bar === state.loop.to && bar !== state.loop.to)) return true;
+  }
+  return false;
 }
 
 function back() {
