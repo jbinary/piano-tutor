@@ -76,7 +76,7 @@ console.log('right hand: ok');
 w.document.querySelector('[data-hand=L]').click();
 w.document.querySelector('#btn-restart').click();
 play(48); assert.equal(S.step, 2); play(43); assert.equal(S.step, 4); play(48);
-assert.ok(statsEl.lastChild.textContent.startsWith('No wrong notes · 3 played 🎉'));
+assert.ok(statsEl.querySelector('.details').textContent.startsWith('No wrong notes · 3 played 🎉'));
 startedOver('left hand');
 console.log('left hand: ok');
 
@@ -101,13 +101,23 @@ const passTime = 4 * beat + 10; // 0:12 at 100 bpm
 const tempoPct = Math.round((100 * 3 * beat) / passTime);
 const expectScore = Math.round(100 * (8 / 9) ** 2 * ((3 * beat) / passTime));
 assert.equal(stats.querySelector('.score').textContent, `🔁 Score ${expectScore}`);
-assert.equal(stats.lastChild.textContent, `1 wrong · 11% of 9 notes played · 0:${String(Math.round(passTime)).padStart(2, '0')} · ${tempoPct}% of tempo`);
+assert.equal(stats.querySelector('.details').textContent, `1 wrong · 11% of 9 notes played · 0:${String(Math.round(passTime)).padStart(2, '0')} · ${tempoPct}% of tempo`);
 console.log('  pass stats:', stats.textContent);
 assert.equal(S.wrong, 0, 'wrong count reset on each loop'); assert.equal(S.played, 0);
 assert.ok(!w.document.querySelector('#progress').textContent.includes('✗'));
 play(61);
 assert.equal(w.document.querySelector('#progress').textContent, 'Bar 1 · 0% · 1 ✗');
 assert.equal(w.document.querySelector('#progress .num').style.width, '1ch', 'bar number sized for the last bar');
+assert.equal(stats.querySelector('.best').textContent, '🏆 New best!');
+assert.equal(S.best['both bars 1-1'].score, expectScore);
+assert.deepEqual({ ...S.best['both bars 1-1'], date: 0 }, { score: expectScore, wrong: 1, notes: 9, seconds: Math.round(passTime), tempo: tempoPct, date: 0 });
+// a slower second pass keeps the best
+play(60, 48); now += 60_000; play(62); now += 60_000; play(64, 43); now += 60_000; play(60, 64, 67);
+assert.equal(stats.querySelector('.best').textContent.split(' · ')[0], `Best ${expectScore}`);
+assert.equal(S.best['both bars 1-1'].score, expectScore);
+// a pass where notes were skipped with ▶ can't be a best
+play(60, 48); w.document.querySelector('#btn-next').click(); play(64, 43); play(60, 64, 67);
+assert.equal(stats.querySelector('.best'), null);
 console.log('loop: ok');
 
 // prev/next buttons and cursor sync
@@ -127,6 +137,7 @@ console.log('keyboard keys:', kb.children.length);
 await new Promise((r) => setTimeout(r, 700));
 await t.openScore(S.scoreId);
 assert.equal(S.step, 1); assert.equal(S.loop.on, true);
+assert.equal(S.best['both bars 1-1'].score, expectScore, 'best kept');
 console.log('persistence: ok');
 const mxl = fs.readFileSync(`${ROOT}/samples/test-two-hands.mxl`);
 const f2 = new w.File([mxl], 'test.mxl'); f2.arrayBuffer = async () => mxl.buffer.slice(mxl.byteOffset, mxl.byteOffset + mxl.length);

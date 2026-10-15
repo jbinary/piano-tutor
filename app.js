@@ -36,6 +36,10 @@ const state = {
   time: { played: 0, written: 0 },
   /** When the last step was completed by playing it, to time the next one. @type {{step:number, at:number}|null} */
   lastDone: null,
+  /** Whether this pass started at the beginning (of the piece or loop), so it can be a best. */
+  fullPass: false,
+  /** Best pass per hand and loop range, e.g. `both bars 5-8`. @type {Record<string, object>} */
+  best: {},
   /** Elements drawn on the score for each wrong key currently held. @type {Map<number, HTMLElement[]>} */
   marks: new Map(),
   /** Blue marks for the correct keys held while the step is not yet complete. @type {HTMLElement[]} */
@@ -82,6 +86,7 @@ async function openScore(id) {
   state.zoom = saved.zoom ?? 1;
   state.transpose = saved.transpose ?? 0;
   state.loop = saved.loop ?? { on: false, from: 1, to: 4 };
+  state.best = saved.best ?? {};
 
   $('#empty').hidden = true;
   $('#title').textContent = osmd.Sheet.TitleString || score.name;
@@ -283,6 +288,7 @@ function timeStep() {
     state.time.written += written;
     state.time.played += Math.min((now - last.at) / 1000, Math.max(10, 3 * written));
   }
+  if (!last) state.fullPass = state.step === firstPlayable();
   state.lastDone = { step: state.step, at: now };
 }
 
@@ -291,6 +297,7 @@ function resetStats() {
   state.played = 0;
   state.time = { played: 0, written: 0 };
   state.lastDone = null;
+  state.fullPass = false;
   updateProgress();
 }
 
@@ -306,6 +313,9 @@ function passScore({ played, wrong, time }) {
 
 const clock = (sec) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 
+/** What a best is kept for: the hand(s) played and the loop's bars, or the whole piece. */
+const bestKey = () => `${state.hand} ${state.loop.on ? `bars ${state.loop.from}-${state.loop.to}` : 'whole'}`;
+
 /** Briefly show the pass's score, with the wrong keys, time and tempo it's made from. */
 let statsTimer;
 function showPassStats() {
@@ -316,14 +326,29 @@ function showPassStats() {
   const details = [
     state.wrong ? `${state.wrong} wrong · ${pct}% of ${total} notes played` : `No wrong notes · ${total} played 🎉`,
   ];
-  if (played > 0) details.push(`${clock(played)} · ${Math.round((100 * written) / played)}% of tempo`);
+  const tempo = played > 0 ? Math.round((100 * written) / played) : null;
+  if (tempo !== null) details.push(`${clock(played)} · ${tempo}% of tempo`);
+  const score = passScore(state);
   el.innerHTML = '';
-  const head = document.createElement('div');
-  head.className = 'score';
-  head.textContent = `🔁 Score ${passScore(state)}`;
-  const body = document.createElement('div');
-  body.textContent = details.join(' · ');
-  el.append(head, body);
+  const line = (cls, text) => {
+    const div = document.createElement('div');
+    div.className = cls;
+    div.textContent = text;
+    el.append(div);
+  };
+  line('score', `🔁 Score ${score}`);
+  line('details', details.join(' · '));
+  if (state.fullPass) {
+    const key = bestKey();
+    const prev = state.best[key];
+    if (!prev || score > prev.score) {
+      state.best[key] = { score, wrong: state.wrong, notes: total, seconds: Math.round(played), tempo, date: Date.now() };
+      saveProgressSoon();
+      line('best new', prev ? `🏆 New best! (was ${prev.score})` : '🏆 New best!');
+    } else {
+      line('best', `Best ${prev.score} · ${new Date(prev.date).toLocaleDateString()}`);
+    }
+  }
   el.hidden = false;
   clearTimeout(statsTimer);
   statsTimer = setTimeout(() => { el.hidden = true; }, 5000);
@@ -354,7 +379,7 @@ function saveProgressSoon() {
   const id = state.scoreId;
   saveTimer = setTimeout(() => {
     if (id === null) return;
-    library.saveProgress(id, { step: state.step, hand: state.hand, zoom: state.zoom, transpose: state.transpose, loop: state.loop });
+    library.saveProgress(id, { step: state.step, hand: state.hand, zoom: state.zoom, transpose: state.transpose, loop: state.loop, best: state.best });
   }, 500);
 }
 
@@ -465,6 +490,7 @@ function syncControls() {
 for (const b of document.querySelectorAll('[data-hand]')) {
   b.addEventListener('click', () => {
     state.hand = b.dataset.hand;
+    resetStats(); // a pass played partly with the other hand(s) doesn't count
     syncControls();
     goTo(nextPlayable(state.step) ?? firstPlayable());
   });
@@ -499,7 +525,11 @@ $('#btn-restart').addEventListener('click', () => {
   goTo(firstPlayable());
 });
 $('#btn-prev').addEventListener('click', back);
-$('#btn-next').addEventListener('click', () => state.steps.length && advance());
+$('#btn-next').addEventListener('click', () => {
+  if (!state.steps.length) return;
+  state.fullPass = false; // skipping notes doesn't count towards a best
+  advance();
+});
 
 function setZoom(z) {
   if (!state.steps.length) return;

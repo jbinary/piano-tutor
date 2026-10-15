@@ -185,6 +185,8 @@ button:active { filter: brightness(1.3); }
 }
 #pass-stats { text-align: center; }
 #pass-stats .score { font-size: 26px; font-weight: 600; }
+#pass-stats .best { margin-top: 4px; opacity: .8; }
+#pass-stats .best.new { opacity: 1; font-weight: 600; color: #facc15; }
 #pass-stats[hidden] { display: none; }
 
 /* ---------- keyboard ---------- */
